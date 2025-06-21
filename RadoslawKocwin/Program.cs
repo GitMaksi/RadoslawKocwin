@@ -1,28 +1,40 @@
 namespace PrzechowalniaBagazu
 {
+    // Abstrakcja: interfejs mówi, co obiekt baga¿u musi umieæ
     public interface IBagaz
     {
+        Guid Id { get; }
         string Opis { get; }
         double Waga { get; }
         string Typ { get; }
         string Szczegoly();
     }
 
+    // Abstrakcja + Hermetyzacja: ukrycie implementacji + wspólna baza dla klas dziedzicz¹cych
     public abstract class Bagaz : IBagaz
     {
+        public Guid Id { get; private set; }
         public string Opis { get; protected set; }
         public double Waga { get; protected set; }
 
         public Bagaz(string opis, double waga)
         {
+            Id = Guid.NewGuid();
             Opis = opis;
             Waga = waga;
         }
 
         public abstract string Typ { get; }
-        public abstract string Szczegoly();
+        public abstract string Szczegoly(); // Polimorfizm
+
+        //bazowa implementacja - któr¹ mo¿na nadpisaæ
+        public void Przeszukaj()
+        {
+            Console.WriteLine("Przeszukuje bagaz");
+        }
     }
 
+    // Dziedziczenie: Walizka dziedziczy po Bagaz
     public class Walizka : Bagaz
     {
         public int Kolka { get; private set; }
@@ -35,11 +47,18 @@ namespace PrzechowalniaBagazu
         public override string Typ => "Walizka";
 
         public override string Szczegoly()
-        {
-            return $"\"{Opis}\" - {Typ}, {Waga} kg, Kó³ka: {Kolka}";
+        {          
+            //ABSTRAKCJA NIEZALEZNA OD IMPLEMENTACJI
+
+
+            //pobraæ dane z bazy
+            //zmodyfikowaæ dane
+            Console.WriteLine("To jest Walizka");
+            return $"[{Id}] \"{Opis}\" - {Typ}, {Waga} kg, Kó³ka: {Kolka}";
         }
     }
 
+    // Dziedziczenie: Plecak dziedziczy po Bagaz
     public class Plecak : Bagaz
     {
         public bool MaLaptopa { get; private set; }
@@ -53,7 +72,8 @@ namespace PrzechowalniaBagazu
 
         public override string Szczegoly()
         {
-            return $"\"{Opis}\" - {Typ}, {Waga} kg, Laptop: {(MaLaptopa ? "tak" : "nie")}";
+            Console.WriteLine("To jest plecak");
+            return $"[{Id}] \"{Opis}\" - {Typ}, {Waga} kg, Laptop: {(MaLaptopa ? "tak" : "nie")}";
         }
     }
 
@@ -64,18 +84,20 @@ namespace PrzechowalniaBagazu
         private NumericUpDown numKolka;
         private CheckBox chkLaptop;
         private ComboBox cmbTyp;
-        private Button btnDodaj;
+        private Button btnDodaj, btnUsun;
         private ListBox lstBagaze;
+
         private List<IBagaz> bagaze = new List<IBagaz>();
 
         public MainForm()
         {
-            Text = "Przechowalnia Baga¿u";
-            Width = 500;
-            Height = 450;
+            Text = "Przechowalnia Baga¿u (OOP)";
+            Width = 550;
+            Height = 520;
 
+            // UI controls
             Label lblOpis = new Label { Text = "Opis:", Left = 20, Top = 20 };
-            txtOpis = new TextBox { Left = 120, Top = 20, Width = 300 };
+            txtOpis = new TextBox { Left = 120, Top = 20, Width = 350 };
 
             Label lblWaga = new Label { Text = "Waga (kg):", Left = 20, Top = 60 };
             numWaga = new NumericUpDown { Left = 120, Top = 60, Width = 100, DecimalPlaces = 1, Maximum = 1000 };
@@ -93,19 +115,16 @@ namespace PrzechowalniaBagazu
             btnDodaj = new Button { Text = "Dodaj baga¿", Left = 120, Top = 220, Width = 150 };
             btnDodaj.Click += (s, e) => DodajBagaz();
 
-            lstBagaze = new ListBox { Left = 20, Top = 270, Width = 440, Height = 120 };
+            btnUsun = new Button { Text = "Usuñ zaznaczony", Left = 280, Top = 220, Width = 150 };
+            btnUsun.Click += (s, e) => UsunWybrany();
 
-            Controls.Add(lblOpis);
-            Controls.Add(txtOpis);
-            Controls.Add(lblWaga);
-            Controls.Add(numWaga);
-            Controls.Add(lblTyp);
-            Controls.Add(cmbTyp);
-            Controls.Add(lblKolka);
-            Controls.Add(numKolka);
-            Controls.Add(chkLaptop);
-            Controls.Add(btnDodaj);
-            Controls.Add(lstBagaze);
+            lstBagaze = new ListBox { Left = 20, Top = 270, Width = 500, Height = 180 };
+
+            Controls.AddRange(new Control[]
+            {
+                lblOpis, txtOpis, lblWaga, numWaga, lblTyp, cmbTyp,
+                lblKolka, numKolka, chkLaptop, btnDodaj, btnUsun, lstBagaze
+            });
         }
 
         private void ToggleFields()
@@ -125,20 +144,39 @@ namespace PrzechowalniaBagazu
 
             IBagaz nowy;
             if (cmbTyp.SelectedItem.ToString() == "Walizka")
-            {
                 nowy = new Walizka(txtOpis.Text, (double)numWaga.Value, (int)numKolka.Value);
-            }
             else
-            {
                 nowy = new Plecak(txtOpis.Text, (double)numWaga.Value, chkLaptop.Checked);
-            }
 
             bagaze.Add(nowy);
             lstBagaze.Items.Add(nowy.Szczegoly());
+
             txtOpis.Clear();
             numWaga.Value = 0;
             numKolka.Value = 0;
             chkLaptop.Checked = false;
+        }
+
+        private void UsunWybrany()
+        {
+            if (lstBagaze.SelectedItem == null) return;
+
+            string selected = lstBagaze.SelectedItem.ToString();
+            int idStart = selected.IndexOf('[') + 1;
+            int idEnd = selected.IndexOf(']');
+            if (idStart >= 0 && idEnd > idStart)
+            {
+                string idStr = selected.Substring(idStart, idEnd - idStart);
+                if (Guid.TryParse(idStr, out Guid id))
+                {
+                    var doUsuniecia = bagaze.FirstOrDefault(b => b.Id == id);
+                    if (doUsuniecia != null)
+                    {
+                        bagaze.Remove(doUsuniecia);
+                        lstBagaze.Items.Remove(selected);
+                    }
+                }
+            }
         }
     }
 
